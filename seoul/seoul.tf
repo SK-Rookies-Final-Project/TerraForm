@@ -34,7 +34,7 @@ data "aws_subnets" "custom" {
   }
 }
 
-# Ubuntu 24.04 LTS AMI 조회
+# Ubuntu 22.04 LTS AMI 조회
 data "aws_ami" "ubuntu" {
   most_recent = true
   owners      = ["099720109477"] # Canonical
@@ -50,27 +50,55 @@ data "aws_ami" "ubuntu" {
   }
 }
 
-# 로컬 Private Key 파일 읽기
-data "local_file" "private_key" {
+# 키 페어 존재 확인을 위한 data source
+data "aws_key_pair" "existing_key" {
+  key_name           = "test-key"
+  include_public_key = true
+}
+
+# 조건부 키 페어 생성 - 존재하지 않을 때만 생성
+resource "aws_key_pair" "test_key" {
+  count      = data.aws_key_pair.existing_key.key_name == null ? 1 : 0
+  key_name   = "test-key"
+  public_key = tls_private_key.test_key[0].public_key_openssh
+}
+
+# 조건부 private key 생성 - 키 페어가 존재하지 않을 때만 생성
+resource "tls_private_key" "test_key" {
+  count     = data.aws_key_pair.existing_key.key_name == null ? 1 : 0
+  algorithm = "RSA"
+  rsa_bits  = 4096
+}
+
+# 조건부 private key 파일 저장 - 키 페어가 존재하지 않을 때만 생성
+resource "local_file" "test_key_pem" {
+  count           = data.aws_key_pair.existing_key.key_name == null ? 1 : 0
+  content         = tls_private_key.test_key[0].private_key_pem
+  filename        = "../common/test-key.pem"
+  file_permission = "0600"
+}
+
+# 기존 키 파일 읽기 - 키 페어가 존재할 때만 사용
+data "local_file" "existing_private_key" {
+  count    = data.aws_key_pair.existing_key.key_name != null ? 1 : 0
   filename = "../common/test-key.pem"
 }
 
-# Private Key에서 Public Key 추출
-data "tls_public_key" "existing_key" {
-  private_key_pem = data.local_file.private_key.content
-}
-
-resource "aws_key_pair" "test_key" {
-  key_name   = "test-key"
-  public_key = data.tls_public_key.existing_key.public_key_openssh
-
-  tags = {
-    Name = "test-key"
+# EC2 보안 그룹 존재 확인
+data "aws_security_groups" "existing_ec2_sg" {
+  filter {
+    name   = "group-name"
+    values = ["ec2-security-group"]
+  }
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.custom.id]
   }
 }
 
-# Security Group - EC2 인스턴스용 (모든 TCP 포트 허용)
+# 조건부 EC2 보안 그룹 생성 - 존재하지 않을 때만 생성
 resource "aws_security_group" "ec2_security_group" {
+  count       = length(data.aws_security_groups.existing_ec2_sg.ids) == 0 ? 1 : 0
   name        = "ec2-security-group"
   description = "Security group for EC2 instances with all TCP access"
   vpc_id      = data.aws_vpc.custom.id
@@ -106,22 +134,35 @@ resource "aws_security_group" "ec2_security_group" {
   }
 }
 
-# Security Group - RDS 전용
+# RDS 보안 그룹 존재 확인
+data "aws_security_groups" "existing_rds_sg" {
+  filter {
+    name   = "group-name"
+    values = ["rds-security-group"]
+  }
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.custom.id]
+  }
+}
+
+# 조건부 RDS 보안 그룹 생성 - 존재하지 않을 때만 생성
 resource "aws_security_group" "rds_security_group" {
+  count       = length(data.aws_security_groups.existing_rds_sg.ids) == 0 ? 1 : 0
   name        = "rds-security-group"
   description = "Security group for RDS instances"
   vpc_id      = data.aws_vpc.custom.id
 
-  # MySQL/Aurora - EC2 보안그룹에서만 접근 허용
+  # MySQL 포트
   ingress {
-    description     = "MySQL/Aurora from EC2 instances"
-    from_port       = 3306
-    to_port         = 3306
-    protocol        = "tcp"
-    security_groups = [aws_security_group.ec2_security_group.id]
+    description = "MySQL"
+    from_port   = 3306
+    to_port     = 3306
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # PostgreSQL - 모든 곳에서 접근 허용
+  # PostgreSQL 포트
   ingress {
     description = "PostgreSQL"
     from_port   = 5432
@@ -143,14 +184,41 @@ resource "aws_security_group" "rds_security_group" {
   }
 }
 
-# RDS Subnet Group (사용자 정의 VPC의 서브넷 사용)
+# locals 블록 추가 - 조건부 리소스 참조를 위한 로컬 값 정의
+locals {
+  # 키 페어 이름 결정
+  key_name = data.aws_key_pair.existing_key.key_name != null ? data.aws_key_pair.existing_key.key_name : aws_key_pair.test_key[0].key_name
+  
+  # 보안 그룹 ID 결정
+  ec2_security_group_id = length(data.aws_security_groups.existing_ec2_sg.ids) > 0 ? data.aws_security_groups.existing_ec2_sg.ids[0] : aws_security_group.ec2_security_group[0].id
+  rds_security_group_id = length(data.aws_security_groups.existing_rds_sg.ids) > 0 ? data.aws_security_groups.existing_rds_sg.ids[0] : aws_security_group.rds_security_group[0].id
+}
+
 resource "aws_db_subnet_group" "custom" {
-  name       = "custom-vpc-subnet-group"
+  name       = "custom-db-subnet-group"
   subnet_ids = data.aws_subnets.custom.ids
 
   tags = {
-    Name = "Custom VPC subnet group"
+    Name = "Custom DB subnet group"
   }
+}
+
+data "aws_security_group" "ec2_security_group" {
+  filter {
+    name   = "group-name"
+    values = ["ec2-security-group"]
+  }
+  # 또는 id = "sg-xxxxxx" 직접 지정 가능
+}
+
+
+data "aws_security_group" "rds_security_group" {
+  filter {
+    name   = "group-name"
+    values = ["rds-security-group"]
+  }
+  # 또는 직접 ID 지정 가능
+  # id = "sg-xxxxxx"
 }
 
 # EC2 인스턴스들
@@ -159,9 +227,9 @@ resource "aws_instance" "controller" {
   count                  = 3
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = "t3.medium"
-  key_name              = aws_key_pair.test_key.key_name
-  vpc_security_group_ids = [aws_security_group.ec2_security_group.id]
-  subnet_id             = data.aws_subnets.custom.ids[count.index % length(data.aws_subnets.custom.ids)]
+  key_name              = local.key_name
+  vpc_security_group_ids = [local.ec2_security_group_id]
+  subnet_id             = "subnet-0b9632f3f4689f54a"
   associate_public_ip_address = true
 
   root_block_device {
@@ -181,9 +249,9 @@ resource "aws_instance" "broker" {
   count                  = 3
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = "t3.large"
-  key_name              = aws_key_pair.test_key.key_name
-  vpc_security_group_ids = [aws_security_group.ec2_security_group.id]
-  subnet_id             = data.aws_subnets.custom.ids[count.index % length(data.aws_subnets.custom.ids)]
+  key_name              = local.key_name
+  vpc_security_group_ids = [local.ec2_security_group_id]
+  subnet_id             = "subnet-0b9632f3f4689f54a"
   associate_public_ip_address = true
 
   root_block_device {
@@ -203,9 +271,9 @@ resource "aws_instance" "connect_worker" {
   count                  = 2
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = "t3.medium"
-  key_name              = aws_key_pair.test_key.key_name
-  vpc_security_group_ids = [aws_security_group.ec2_security_group.id]
-  subnet_id             = data.aws_subnets.custom.ids[count.index % length(data.aws_subnets.custom.ids)]
+  key_name              = local.key_name
+  vpc_security_group_ids = [local.ec2_security_group_id]
+  subnet_id             = "subnet-0b9632f3f4689f54a"
   associate_public_ip_address = true
 
   root_block_device {
@@ -225,9 +293,9 @@ resource "aws_instance" "schema_registry" {
   count                  = 2
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = "t3.small"
-  key_name              = aws_key_pair.test_key.key_name
-  vpc_security_group_ids = [aws_security_group.ec2_security_group.id]
-  subnet_id             = data.aws_subnets.custom.ids[count.index % length(data.aws_subnets.custom.ids)]
+  key_name              = local.key_name
+  vpc_security_group_ids = [local.ec2_security_group_id]
+  subnet_id             = "subnet-0b9632f3f4689f54a"
   associate_public_ip_address = true
 
   root_block_device {
@@ -246,9 +314,9 @@ resource "aws_instance" "schema_registry" {
 resource "aws_instance" "control_center" {
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = "t3.large"
-  key_name              = aws_key_pair.test_key.key_name
-  vpc_security_group_ids = [aws_security_group.ec2_security_group.id]
-  subnet_id             = data.aws_subnets.custom.ids[0]
+  key_name              = local.key_name
+  vpc_security_group_ids = [local.ec2_security_group_id]
+  subnet_id             = "subnet-0b9632f3f4689f54a"
   associate_public_ip_address = true
 
   root_block_device {
@@ -312,7 +380,7 @@ resource "aws_db_instance" "mysql" {
   password = "tgmaster!"
   
   # 네트워크 설정 - RDS 전용 보안 그룹 사용
-  vpc_security_group_ids = [aws_security_group.rds_security_group.id]
+  vpc_security_group_ids = [local.rds_security_group_id]
   db_subnet_group_name   = aws_db_subnet_group.custom.name
   publicly_accessible    = true
   
@@ -358,7 +426,7 @@ resource "aws_db_instance" "postgresql" {
   password = "tgmaster!"
   
   # 네트워크 설정 - RDS 전용 보안 그룹 사용
-  vpc_security_group_ids = [aws_security_group.rds_security_group.id]
+  vpc_security_group_ids = [local.rds_security_group_id]
   db_subnet_group_name   = aws_db_subnet_group.custom.name
   publicly_accessible    = true
   
@@ -467,5 +535,5 @@ output "postgresql_endpoint" {
 
 output "private_key_path" {
   description = "SSH 접근을 위한 Private Key 경로"
-  value       = "../common/test-key.pem"  # 기존: local_file.test-key_pem.filename
+  value       = "../common/test-key.pem"
 }
