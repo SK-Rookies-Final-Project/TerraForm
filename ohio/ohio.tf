@@ -41,7 +41,7 @@ data "aws_ami" "amazon_linux" {
 
 # 로컬 Private Key 파일 읽기
 data "local_file" "private_key" {
-  filename = "${path.module}/test-key.pem"
+  filename = "../common/test-key.pem"
 }
 
 # Private Key에서 Public Key 추출
@@ -211,5 +211,5 @@ output "postgresql_endpoint" {
 
 output "private_key_path" {
   description = "SSH 접근을 위한 Private Key 경로"
-  value       = "${path.module}/test-key.pem"
+  value       = "../common/test-key.pem"
 }
