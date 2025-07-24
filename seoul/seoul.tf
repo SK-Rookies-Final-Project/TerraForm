@@ -194,23 +194,13 @@ locals {
   rds_security_group_id = length(data.aws_security_groups.existing_rds_sg.ids) > 0 ? data.aws_security_groups.existing_rds_sg.ids[0] : aws_security_group.rds_security_group[0].id
 }
 
-resource "aws_db_subnet_group" "custom" {
-  name       = "custom-db-subnet-group"
-  subnet_ids = data.aws_subnets.custom.ids
-
-  tags = {
-    Name = "Custom DB subnet group"
-  }
-}
 
 data "aws_security_group" "ec2_security_group" {
   filter {
     name   = "group-name"
     values = ["ec2-security-group"]
   }
-  # 또는 id = "sg-xxxxxx" 직접 지정 가능
 }
-
 
 data "aws_security_group" "rds_security_group" {
   filter {
@@ -357,6 +347,15 @@ resource "aws_eip" "schema_registry_eip" {
   depends_on = [aws_instance.schema_registry]
 }
 
+resource "aws_db_subnet_group" "rds_subnet_group" {
+  name       = "rds-subnet-group"
+  subnet_ids = data.aws_subnets.custom.ids
+
+  tags = {
+    Name = "RDS Subnet Group"
+  }
+}
+
 # Amazon RDS for MySQL
 resource "aws_db_instance" "mysql" {
   identifier = "tgmysqldb"
@@ -381,7 +380,7 @@ resource "aws_db_instance" "mysql" {
   
   # 네트워크 설정 - RDS 전용 보안 그룹 사용
   vpc_security_group_ids = [local.rds_security_group_id]
-  db_subnet_group_name   = aws_db_subnet_group.custom.name
+  db_subnet_group_name   = aws_db_subnet_group.rds_subnet_group.name
   publicly_accessible    = true
   
   # 파라미터 및 옵션 그룹
@@ -427,7 +426,7 @@ resource "aws_db_instance" "postgresql" {
   
   # 네트워크 설정 - RDS 전용 보안 그룹 사용
   vpc_security_group_ids = [local.rds_security_group_id]
-  db_subnet_group_name   = aws_db_subnet_group.custom.name
+  db_subnet_group_name   = aws_db_subnet_group.rds_subnet_group.name
   publicly_accessible    = true
   
   # 파라미터 그룹
