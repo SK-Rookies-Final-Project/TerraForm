@@ -25,15 +25,21 @@
         state: present
         
     - name: Verify installed packages
-      command: "{{ item }} --version"
-      register: package_versions
-      with_items:
-        - wget
-        - unzip
-        - curl
-        - git
-        - java
-      ignore_errors: yes
+      block:
+        - name: Verify version for most packages
+          command: "{{ item }} --version"
+          register: package_versions
+          with_items:
+            - wget
+            - curl
+            - git
+            - java
+          ignore_errors: yes
+
+        - name: Check unzip availability
+          command: which unzip
+          register: unzip_check
+          ignore_errors: yes
       
     - name: Display package versions
       debug:
