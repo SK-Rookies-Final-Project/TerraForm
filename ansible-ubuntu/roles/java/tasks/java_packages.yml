@@ -1,0 +1,112 @@
+# 필수 패키지 설치
+- name: Install required packages
+  apt:
+    name:
+      - wget
+      - net-tools
+      - openssh-server
+      - firewalld
+      - unzip
+      - curl
+      - git
+    state: present
+    update_cache: yes
+
+# 방화벽 서비스 비활성화
+- name: Disable firewalld
+  service:
+    name: firewalld
+    enabled: false
+    state: stopped
+
+# SSH 서비스 활성화
+- name: Enable SSH service
+  service:
+    name: ssh
+    state: started
+    enabled: true
+
+#JDK 설치
+- name: Download JDK file using wget
+  get_url:
+    url: https://download.java.net/java/GA/jdk17.0.2/dfd4a8d0985749f896bed50d7138ee7f/8/GPL/openjdk-17.0.2_linux-x64_bin.tar.gz
+    dest: /home/ubuntu/openjdk-17.0.2_linux-x64_bin.tar.gz
+
+- name: Extract JDK
+  unarchive:
+    src: /home/ubuntu/openjdk-17.0.2_linux-x64_bin.tar.gz
+    dest: /home/ubuntu
+    remote_src: yes
+
+- name: Set JAVA_HOME and update PATH
+  lineinfile:
+    path: /etc/profile
+    line: "{{ item }}"
+    create: yes
+  with_items:
+    - 'export JAVA_HOME=/home/ubuntu/jdk-17.0.2'
+    - 'export PATH=$JAVA_HOME/bin:$PATH'
+
+- name: Apply environment
+  shell: source /etc/profile #source 명령은 ssh 수동 접속 시 적용
+  args:
+    executable: /bin/bash
+
+- name: Link java binary to /usr/bin/java
+  file:
+    src: /home/ubuntu/jdk-17.0.2/bin/java
+    dest: /usr/bin/java
+    state: link
+    force: yes
+
+- name: Link javac binary to /usr/bin/javac
+  file:
+    src: /home/ubuntu/jdk-17.0.2/bin/javac
+    dest: /usr/bin/javac
+    state: link
+    force: yes
+
+
+# 기본 디렉토리 생성
+- name: Create required directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: '0755'
+  loop:
+    - /data
+    - /log
+    - /engn
+
+# 디렉토리 권한 부여
+- name: Change ownership of directories
+  file:
+    path: "{{ item }}"
+    owner: ubuntu
+    group: ubuntu
+    recurse: yes
+  loop:
+    - /data
+    - /log
+    - /engn
+
+# 컨플루언트 플랫폼 스크립트 설치
+- name: Download Confluent Platform archive
+  get_url:
+    url: https://packages.confluent.io/archive/7.7/confluent-7.7.1.tar.gz
+    dest: /engn/confluent-7.7.1.tar.gz
+
+- name: Extract Confluent Platform archive
+  unarchive:
+    src: /engn/confluent-7.7.1.tar.gz
+    dest: /engn
+    remote_src: yes
+
+# 심볼릭 링크 생성
+- name: Create symbolic link for Confluent directory
+  file:
+    src: /engn/confluent-7.7.1
+    dest: /engn/confluent
+    state: link

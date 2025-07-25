@@ -1,0 +1,18 @@
+- name: Setup All Instances on EC2
+  hosts: all
+  become: true                              # 관리자 권한(sudo)으로 실행
+  roles:
+    - java_setup                            # java_setup 역할 실행
+    - connect_worker                        # connect_worker 역할 실행
+
+- name: Setup MySQL RDS
+  hosts: RDS_MySQL
+  become: false
+  roles:
+    - mysql_setup
+
+- name: Setup PostgreSQL RDS
+  hosts: RDS_PostgreSQL
+  become: false
+  roles:
+    - postgresql_setup
