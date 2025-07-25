@@ -1,5 +1,4 @@
-# Terraform 구성 - Confluent Platform Infrastructure
-# Provider 설정
+# Terraform 설정
 terraform {
   required_providers {
     aws = {
@@ -14,11 +13,6 @@ provider "aws" {
   access_key = var.aws_access_key
   secret_key = var.aws_secret_key
   region     = "ap-northeast-2"
-}
-
-# Data Sources
-data "aws_availability_zones" "available" {
-  state = "available"
 }
 
 # 기존 VPC 참조 (미리 생성된 VPC 사용)

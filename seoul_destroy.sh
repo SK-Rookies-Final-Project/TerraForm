@@ -1,2 +1,2 @@
 cd seoul
-terraform destroy -var-file="../common/terraform.tfvars"
+terraform destroy -auto-approve -var-file="../common/terraform.tfvars"
