@@ -1,9 +1,24 @@
-# Terraform 설정
+# Terraform Provider 설정
 terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
       version = "~> 5.0"
+    }
+
+    tls = {
+      source  = "hashicorp/tls"
+      version = "~> 4.0"
+    }
+
+    local = {
+      source  = "hashicorp/local"
+      version = "~> 2.0"
+    }
+
+    external = {
+      source  = "hashicorp/external"  
+      version = "~> 2.0"
     }
   }
 }
@@ -50,14 +65,6 @@ resource "local_file" "private_key" {
   content         = tls_private_key.generated_key[0].private_key_pem
   filename        = pathexpand(local.private_key_path)
   file_permission = "0600"
-}
-
-# 새로 생성된 퍼블릭 키도 함께 저장
-resource "local_file" "public_key" {
-  count           = local.key_exists ? 0 : 1
-  content         = tls_private_key.generated_key[0].public_key_openssh
-  filename        = pathexpand("~/Desktop/ct/common/test-key.pub")
-  file_permission = "0644"
 }
 
 # AWS Provider 설정 - 오하이오 리전
