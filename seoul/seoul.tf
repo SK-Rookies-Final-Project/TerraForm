@@ -459,8 +459,13 @@ resource "aws_db_instance" "mysql" {
   # 기타 설정
   publicly_accessible      = false
   storage_encrypted        = true
-  skip_final_snapshot      = true
   deletion_protection      = false
+
+  # 속도 향상
+  skip_final_snapshot      = true
+  delete_automated_backups  = true
+  backup_retention_period   = 0
+  backup_window            = null
 
   tags = {
     Name = "TG MySQL Database"
@@ -488,8 +493,13 @@ resource "aws_db_instance" "postgresql" {
   # 기타 설정
   publicly_accessible      = false
   storage_encrypted        = true
-  skip_final_snapshot      = true
   deletion_protection      = false
+
+  # 속도 향상
+  skip_final_snapshot      = true
+  delete_automated_backups  = true
+  backup_retention_period   = 0
+  backup_window            = null
 
   tags = {
     Name = "TG PostgreSQL Database"
