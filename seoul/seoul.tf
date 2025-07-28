@@ -374,6 +374,31 @@ resource "aws_instance" "control_center" {
   depends_on = [aws_key_pair.test_key]
 }
 
+resource "aws_instance" "ksql_db" {
+  ami                    = data.aws_ami.ubuntu.id
+  instance_type          = "t3.small"
+  key_name              = aws_key_pair.test_key.key_name
+  subnet_id             = aws_subnet.public_subnet_2a.id
+  vpc_security_group_ids = [aws_security_group.ec2_instances_sg.id]
+
+  # 퍼블릭 IP 자동 할당 활성화
+  associate_public_ip_address = true
+
+  root_block_device {
+    volume_type = "gp2"
+    volume_size = 30
+    encrypted   = true
+  }
+
+  tags = {
+    Name = "KSQL_DB"
+    Type = "ksql_database"
+  }
+
+  # 키 페어가 생성될 때까지 대기
+  depends_on = [aws_key_pair.test_key]
+}
+
 # EIP 할당 - Broker 3개
 resource "aws_eip" "broker_eip" {
   count    = 3

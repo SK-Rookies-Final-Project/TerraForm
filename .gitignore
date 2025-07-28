@@ -4,6 +4,9 @@
 # 키
 test-key.pem
 
+# ansible-inventory
+ansible-ubuntu/inventory.ini
+
 # 생성 파일
 **/.terraform/
 **/.terraform.*
