@@ -270,6 +270,18 @@ resource "aws_instance" "docker_compose" {
   depends_on = [aws_key_pair.test_key]
 }
 
+# EIP 할당 - Docker Container
+resource "aws_eip" "docker_compose_eip" {
+  count       = 1
+  instance    = aws_instance.docker_compose.id
+  domain      = "vpc"
+  tags = {
+    Name = "DockerCompose-EIP"
+  }
+
+  depends_on = [aws_instance.docker_compose]
+}
+
 # RDS용 보안 그룹
 resource "aws_security_group" "rds_sg" {
   name        = "rds-security-group"
