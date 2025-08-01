@@ -77,18 +77,34 @@
         append: yes
       when: ansible_user is defined
 
-    - name: Docker 버전 확인
-      command: docker --version
-      register: docker_version
-      changed_when: false
+    # Docker 권한 적용을 위한 추가 작업들
+    - name: 사용자별 docker 그룹 추가 (연결된 모든 사용자)
+      user:
+        name: "{{ item }}"
+        groups: docker
+        append: yes
+      loop: "{{ ansible_all_ipv4_addresses | map('extract', hostvars) | selectattr('ansible_user', 'defined') | map(attribute='ansible_user') | list | unique }}"
+      when: ansible_all_ipv4_addresses is defined
+      ignore_errors: yes
 
-    - name: Docker Compose 버전 확인
-      command: docker-compose --version
-      register: docker_compose_version_output
-      changed_when: false
+    - name: 현재 SSH 사용자를 docker 그룹에 추가
+      user:
+        name: "{{ ansible_ssh_user | default(ansible_user) }}"
+        groups: docker
+        append: yes
+      when: ansible_ssh_user is defined or ansible_user is defined
 
-    - name: 설치 결과 출력
-      debug:
-        msg:
-          - "Docker 설치 완료: {{ docker_version.stdout }}"
-          - "Docker Compose 설치 완료: {{ docker_compose_version_output.stdout }}"
+    - name: Docker 소켓 권한 확인 및 설정
+      file:
+        path: /var/run/docker.sock
+        group: docker
+        mode: '0664'
+
+    - name: Docker 그룹 권한 새로고침을 위한 스크립트 생성
+      copy:
+        content: |
+          #!/bin/bash
+          # Docker 그룹 권한을 즉시 적용하는 스크립트
+          newgrp docker
+        dest: /tmp/refresh_docker_group.sh
+        mode: '0755'
