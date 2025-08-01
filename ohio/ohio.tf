@@ -339,7 +339,7 @@ resource "aws_db_instance" "mysql" {
   db_subnet_group_name      = aws_db_subnet_group.rds_subnet_group.name
 
   # 기타 설정
-  publicly_accessible      = false
+  publicly_accessible      = true # 개발 단계
   storage_encrypted        = true
   deletion_protection      = false
 
@@ -373,7 +373,7 @@ resource "aws_db_instance" "postgresql" {
   db_subnet_group_name      = aws_db_subnet_group.rds_subnet_group.name
 
   # 기타 설정
-  publicly_accessible      = false
+  publicly_accessible      = true # 개발 단계
   storage_encrypted        = true
   deletion_protection      = false
 
