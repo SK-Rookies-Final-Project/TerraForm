@@ -298,7 +298,7 @@ resource "aws_instance" "broker" {
 resource "aws_instance" "connect_worker" {
   count                  = 2
   ami                    = data.aws_ami.ubuntu.id
-  instance_type          = "t3.medium"
+  instance_type          = "t3.large"
   key_name              = aws_key_pair.test_key.key_name
   subnet_id             = aws_subnet.public_subnet_2a.id
   vpc_security_group_ids = [aws_security_group.ec2_instances_sg.id]
@@ -431,13 +431,14 @@ resource "aws_security_group" "rds_sg" {
   description = "Security group for RDS instances"
   vpc_id      = aws_vpc.main_vpc.id
 
-  # PostgreSQL 접근 허용 (포트 5432) - 모든 곳에서
+  # PostgreSQL 접근 허용 (포트 5432) - 모든 곳에서 IPv4/IPv6
   ingress {
-    from_port   = 5432
-    to_port     = 5432
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "PostgreSQL access from anywhere"
+    from_port        = 5432
+    to_port          = 5432
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]      # IPv4
+    ipv6_cidr_blocks = ["::/0"]           # IPv6
+    description      = "PostgreSQL access from anywhere"
   }
 
   # MySQL/Aurora 접근 허용 (포트 3306) - EC2 보안 그룹에서
@@ -482,7 +483,7 @@ resource "aws_db_instance" "mysql" {
   db_subnet_group_name      = aws_db_subnet_group.rds_subnet_group.name
 
   # 기타 설정
-  publicly_accessible      = false
+  publicly_accessible      = true
   storage_encrypted        = true
   deletion_protection      = false
 
@@ -516,7 +517,7 @@ resource "aws_db_instance" "postgresql" {
   db_subnet_group_name      = aws_db_subnet_group.rds_subnet_group.name
 
   # 기타 설정
-  publicly_accessible      = false
+  publicly_accessible      = true
   storage_encrypted        = true
   deletion_protection      = false
 
