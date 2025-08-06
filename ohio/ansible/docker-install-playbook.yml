@@ -108,3 +108,16 @@
           newgrp docker
         dest: /tmp/refresh_docker_group.sh
         mode: '0755'
+
+
+- name : RDS SETUP
+  hosts: webservers
+  become: true
+  roles:
+    - rds_setup
+
+- name : LINKING SETUP
+  hosts: webservers
+  become: true
+  roles:
+    - linking_setup
