@@ -5,10 +5,10 @@
   become: yes
   become_user: ubuntu
 
-- name: Copy jdbc-postgres-sink.json to remote Docker host
+- name: Copy jdbc-postgre-sink.json to remote Docker host
   copy:
     src: jdbc-postgres-sink.json
-    dest: /home/ubuntu/jdbc-postgres-sink.json
+    dest: /home/ubuntu/jdbc-postgre-sink.json
   become: yes
   become_user: ubuntu
 
