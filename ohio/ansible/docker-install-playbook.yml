@@ -1,113 +1,113 @@
----
-- name: Docker 및 필수 패키지 설치
-  hosts: all
-  become: yes
-  vars:
-    docker_compose_version: "v2.29.7"
+# ---
+# - name: Docker 및 필수 패키지 설치
+#   hosts: all
+#   become: yes
+#   vars:
+#     docker_compose_version: "v2.29.7"
     
-  tasks:
-    - name: 시스템 패키지 업데이트
-      apt:
-        update_cache: yes
-        cache_valid_time: 3600
+#   tasks:
+#     - name: 시스템 패키지 업데이트
+#       apt:
+#         update_cache: yes
+#         cache_valid_time: 3600
       
-    - name: 필수 패키지 설치
-      apt:
-        name:
-          - wget
-          - net-tools
-          - openssh-server
-          - firewalld
-          - unzip
-          - curl
-          - git
-          - apt-transport-https
-          - ca-certificates
-          - gnupg-agent
-          - software-properties-common
-        state: present
-        update_cache: yes
+#     - name: 필수 패키지 설치
+#       apt:
+#         name:
+#           - wget
+#           - net-tools
+#           - openssh-server
+#           - firewalld
+#           - unzip
+#           - curl
+#           - git
+#           - apt-transport-https
+#           - ca-certificates
+#           - gnupg-agent
+#           - software-properties-common
+#         state: present
+#         update_cache: yes
 
-    - name: Docker GPG 키 추가
-      apt_key:
-        url: https://download.docker.com/linux/ubuntu/gpg
-        state: present
+#     - name: Docker GPG 키 추가
+#       apt_key:
+#         url: https://download.docker.com/linux/ubuntu/gpg
+#         state: present
 
-    - name: Docker 공식 저장소 추가
-      apt_repository:
-        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
-        state: present
+#     - name: Docker 공식 저장소 추가
+#       apt_repository:
+#         repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+#         state: present
 
-    - name: 패키지 캐시 업데이트
-      apt:
-        update_cache: yes
+#     - name: 패키지 캐시 업데이트
+#       apt:
+#         update_cache: yes
 
-    - name: Docker 패키지 설치
-      apt:
-        name:
-          - docker-ce
-          - docker-ce-cli
-          - containerd.io
-        state: present
+#     - name: Docker 패키지 설치
+#       apt:
+#         name:
+#           - docker-ce
+#           - docker-ce-cli
+#           - containerd.io
+#         state: present
 
-    - name: Docker 서비스 시작 및 활성화
-      systemd:
-        name: docker
-        state: started
-        enabled: yes
+#     - name: Docker 서비스 시작 및 활성화
+#       systemd:
+#         name: docker
+#         state: started
+#         enabled: yes
 
-    - name: Docker Compose 다운로드
-      get_url:
-        url: "https://github.com/docker/compose/releases/download/{{ docker_compose_version }}/docker-compose-{{ ansible_system }}-{{ ansible_architecture }}"
-        dest: /usr/local/bin/docker-compose
-        mode: '0755'
-        owner: root
-        group: root
+#     - name: Docker Compose 다운로드
+#       get_url:
+#         url: "https://github.com/docker/compose/releases/download/{{ docker_compose_version }}/docker-compose-{{ ansible_system }}-{{ ansible_architecture }}"
+#         dest: /usr/local/bin/docker-compose
+#         mode: '0755'
+#         owner: root
+#         group: root
 
-    - name: Docker Compose 심볼릭 링크 생성
-      file:
-        src: /usr/local/bin/docker-compose
-        dest: /usr/bin/docker-compose
-        state: link
+#     - name: Docker Compose 심볼릭 링크 생성
+#       file:
+#         src: /usr/local/bin/docker-compose
+#         dest: /usr/bin/docker-compose
+#         state: link
 
-    - name: 현재 사용자를 docker 그룹에 추가
-      user:
-        name: "{{ ansible_user }}"
-        groups: docker
-        append: yes
-      when: ansible_user is defined
+#     - name: 현재 사용자를 docker 그룹에 추가
+#       user:
+#         name: "{{ ansible_user }}"
+#         groups: docker
+#         append: yes
+#       when: ansible_user is defined
 
-    # Docker 권한 적용을 위한 추가 작업들
-    - name: 사용자별 docker 그룹 추가 (연결된 모든 사용자)
-      user:
-        name: "{{ item }}"
-        groups: docker
-        append: yes
-      loop: "{{ ansible_all_ipv4_addresses | map('extract', hostvars) | selectattr('ansible_user', 'defined') | map(attribute='ansible_user') | list | unique }}"
-      when: ansible_all_ipv4_addresses is defined
-      ignore_errors: yes
+#     # Docker 권한 적용을 위한 추가 작업들
+#     - name: 사용자별 docker 그룹 추가 (연결된 모든 사용자)
+#       user:
+#         name: "{{ item }}"
+#         groups: docker
+#         append: yes
+#       loop: "{{ ansible_all_ipv4_addresses | map('extract', hostvars) | selectattr('ansible_user', 'defined') | map(attribute='ansible_user') | list | unique }}"
+#       when: ansible_all_ipv4_addresses is defined
+#       ignore_errors: yes
 
-    - name: 현재 SSH 사용자를 docker 그룹에 추가
-      user:
-        name: "{{ ansible_ssh_user | default(ansible_user) }}"
-        groups: docker
-        append: yes
-      when: ansible_ssh_user is defined or ansible_user is defined
+#     - name: 현재 SSH 사용자를 docker 그룹에 추가
+#       user:
+#         name: "{{ ansible_ssh_user | default(ansible_user) }}"
+#         groups: docker
+#         append: yes
+#       when: ansible_ssh_user is defined or ansible_user is defined
 
-    - name: Docker 소켓 권한 확인 및 설정
-      file:
-        path: /var/run/docker.sock
-        group: docker
-        mode: '0664'
+#     - name: Docker 소켓 권한 확인 및 설정
+#       file:
+#         path: /var/run/docker.sock
+#         group: docker
+#         mode: '0664'
 
-    - name: Docker 그룹 권한 새로고침을 위한 스크립트 생성
-      copy:
-        content: |
-          #!/bin/bash
-          # Docker 그룹 권한을 즉시 적용하는 스크립트
-          newgrp docker
-        dest: /tmp/refresh_docker_group.sh
-        mode: '0755'
+#     - name: Docker 그룹 권한 새로고침을 위한 스크립트 생성
+#       copy:
+#         content: |
+#           #!/bin/bash
+#           # Docker 그룹 권한을 즉시 적용하는 스크립트
+#           newgrp docker
+#         dest: /tmp/refresh_docker_group.sh
+#         mode: '0755'
 
 
 - name : RDS SETUP
