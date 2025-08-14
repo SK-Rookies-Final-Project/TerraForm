@@ -108,3 +108,37 @@
           newgrp docker
         dest: /tmp/refresh_docker_group.sh
         mode: '0755'
+    
+    - name: 깃허브 클론
+      git:
+        repo: https://github.com/SK-Rookies-Final-Project/Docker-Container.git
+        dest: /home/ubuntu/Docker-Container        
+        clone: yes
+        update: no
+
+    - name: Docker 실행
+      shell: ./start-all.sh
+      args:
+        chdir: /home/ubuntu/Docker-Container/scripts
+
+    - name: Docker 컨테이너가 모두 실행될 때까지 대기
+      shell: >
+        until docker ps -a | grep -E 'Up.*(broker1|broker2|broker3|kafka-connect1|kafka-connect2|schema-registry1|schema-registry2|control-center)' | wc -l | grep -q 8;
+        do sleep 5; done
+      register: wait_result
+      retries: 20
+      delay: 5
+      until: wait_result.rc == 0
+
+
+- name : RDS SETUP
+  hosts: webservers
+  become: true
+  roles:
+    - rds_setup
+
+- name : LINKING SETUP
+  hosts: webservers
+  become: true
+  roles:
+    - linking_setup
