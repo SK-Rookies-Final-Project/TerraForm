@@ -1,4 +1,3 @@
-# 필수 패키지 설치
 - name: Install required packages
   apt:
     name:
@@ -26,42 +25,43 @@
     state: started
     enabled: true
 
-#JDK 설치
-- name: Download JDK file using wget
+- name: Download OpenJDK 17.0.8 (Adoptium)
   get_url:
-    url: https://download.java.net/java/GA/jdk17.0.2/dfd4a8d0985749f896bed50d7138ee7f/8/GPL/openjdk-17.0.2_linux-x64_bin.tar.gz
-    dest: /home/ubuntu/openjdk-17.0.2_linux-x64_bin.tar.gz
+    url: https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.8+7/OpenJDK17U-jdk_x64_linux_hotspot_17.0.8_7.tar.gz
+    dest: /home/ubuntu/openjdk-17.0.8.tar.gz
 
-- name: Extract JDK
+
+- name: Extract OpenJDK 17.0.8 to /opt/java
   unarchive:
-    src: /home/ubuntu/openjdk-17.0.2_linux-x64_bin.tar.gz
+    src: /home/ubuntu/openjdk-17.0.8.tar.gz
     dest: /home/ubuntu
     remote_src: yes
 
-- name: Set JAVA_HOME and update PATH
+- name: Set JAVA_HOME and update PATH for Java 17
   lineinfile:
-    path: /etc/profile
+    path: /etc/profile.d/java.sh
     line: "{{ item }}"
     create: yes
-  with_items:
-    - 'export JAVA_HOME=/home/ubuntu/jdk-17.0.2'
+    mode: '0755'
+  loop:
+    - 'export JAVA_HOME=/home/ubuntu/jdk-17.0.8+7'
     - 'export PATH=$JAVA_HOME/bin:$PATH'
 
-- name: Apply environment
-  shell: source /etc/profile #source 명령은 ssh 수동 접속 시 적용
+- name: Ensure JAVA_HOME is applied for current session
+  shell: source /etc/profile.d/java.sh
   args:
     executable: /bin/bash
 
-- name: Link java binary to /usr/bin/java
+- name: Ensure /usr/bin/java points to installed OpenJDK 17
   file:
-    src: /home/ubuntu/jdk-17.0.2/bin/java
+    src: /home/ubuntu/jdk-17.0.8+7/bin/java
     dest: /usr/bin/java
     state: link
     force: yes
 
-- name: Link javac binary to /usr/bin/javac
+- name: Ensure /usr/bin/javac points to installed OpenJDK 17
   file:
-    src: /home/ubuntu/jdk-17.0.2/bin/javac
+    src: /home/ubuntu/jdk-17.0.8+7/bin/javac
     dest: /usr/bin/javac
     state: link
     force: yes

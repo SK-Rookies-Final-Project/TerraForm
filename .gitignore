@@ -12,5 +12,33 @@ ansible-ubuntu/inventory.ini
 **/.terraform.*
 **/terraform.tfstate*
 
-# 명령어 파일
-cmd
+## seoul/ansible
+
+# Secret vars
+seoul/ansible/group_vars/*
+seoul/ansible/host_vars/*
+
+# SSH keys or credentials
+seoul/ansible/*.pem
+seoul/ansible/*.key
+
+
+# Logs and temporary files
+seoul/ansible/*.log
+seoul/ansible/*.retry
+seoul/ansible/*.tmp
+
+# Ansible cache
+seoul/ansible/__pycache__/
+seoul/ansible/*.pyc
+seoul/ansible/*.pyo
+seoul/ansible/*.db
+
+# VSCode settings
+seoul/ansible/.vscode/
+seoul/ansible/.DS_Store/
+
+# Java Application
+seoul/ansible/app/*
+
+# vars
