@@ -4,8 +4,8 @@
   become: yes
   vars:
     docker_compose_version: "v2.29.7"
-    local_docker_container_path: "../docker-container"  # 로컬 docker-container 디렉토리 경로
-    remote_docker_container_path: "/home/ubuntu"  # 원격 서버 목적지 경로
+    local_docker_container_path: "../docker-container"
+    remote_docker_container_path: "/home/ubuntu"
     
   tasks:
     - name: 시스템 패키지 업데이트
@@ -79,7 +79,6 @@
         append: yes
       when: ansible_user is defined
 
-    # Docker 권한 적용을 위한 추가 작업들
     - name: 사용자별 docker 그룹 추가 (연결된 모든 사용자)
       user:
         name: "{{ item }}"
@@ -102,16 +101,6 @@
         group: docker
         mode: '0664'
 
-    - name: Docker 그룹 권한 새로고침을 위한 스크립트 생성
-      copy:
-        content: |
-          #!/bin/bash
-          # Docker 그룹 권한을 즉시 적용하는 스크립트
-          newgrp docker
-        dest: /tmp/refresh_docker_group.sh
-        mode: '0755'
-
-    # 로컬 docker-container 디렉토리 복사
     - name: 로컬 docker-container 디렉토리 존재 확인
       local_action:
         module: stat
@@ -136,15 +125,14 @@
         mode: '0755'
 
     - name: 로컬 docker-container 디렉토리를 원격 서버로 복사
-      synchronize:
+      copy:
         src: "{{ local_docker_container_path }}/"
         dest: "{{ remote_docker_container_path }}"
-        delete: yes
-        recursive: yes
-        perms: yes
-        owner: no
-        group: no
-      become: no
+        owner: ubuntu
+        group: ubuntu
+        mode: preserve
+        directory_mode: '0755'
+      become: yes
 
     - name: 복사된 파일들의 소유권 변경
       file:
@@ -167,23 +155,94 @@
         mode: '0755'
       ignore_errors: yes
 
-    - name: Docker 실행
-      shell: ./start-all.sh
-      args:
-        chdir: "{{ remote_docker_container_path }}/scripts"
+    # 개선된 Docker 실행 부분 - 실시간 로그 확인 및 타임아웃 설정
+    - name: start-all.sh 스크립트 내용 확인
+      shell: head -20 {{ remote_docker_container_path }}/scripts/start-all.sh
       become_user: ubuntu
-      register: docker_start_output
-
-    - name: Docker 시작 로그 출력
+      register: script_content
+      
+    - name: 스크립트 내용 출력
       debug:
-        var: docker_start_output.stdout_lines
+        var: script_content.stdout_lines
 
-    - name: Docker 컨테이너가 모두 실행될 때까지 대기
-      shell: >
-        until docker ps -a | grep -E 'Up.*(broker1|broker2|broker3|kafka-connect1|kafka-connect2|schema-registry1|schema-registry2|control-center)' | wc -l | grep -q 8;
-        do sleep 5; done
-      register: wait_result
-      retries: 20
-      delay: 5
-      until: wait_result.rc == 0
+    - name: Docker 실행 (비동기 시작)
+      shell: nohup ./scripts/start-all.sh > scripts/start-all.log 2>&1 &
+      args:
+        chdir: "{{ remote_docker_container_path }}"
       become_user: ubuntu
+      register: docker_start_async
+
+    - name: Docker 실행 진행 상황 모니터링 (초기 30초)
+      shell: tail -20 {{ remote_docker_container_path }}/scripts/start-all.log || echo "로그 파일이 아직 생성되지 않았습니다"
+      become_user: ubuntu
+      register: initial_log
+      retries: 6
+      delay: 5
+      
+    - name: 초기 Docker 시작 로그 출력
+      debug:
+        msg: "=== Docker 시작 진행 상황 ==="
+        
+    - name: 초기 로그 내용 출력
+      debug:
+        var: initial_log.stdout_lines
+
+    - name: Docker 컨테이너 상태 확인 (최대 10분 대기)
+      shell: |
+        echo "=== 현재 시각: $(date) ==="
+        echo "=== Docker 프로세스 상태 ==="
+        ps aux | grep docker | grep -v grep || echo "Docker 프로세스 없음"
+        echo ""
+        echo "=== 실행 중인 컨테이너 ==="
+        docker ps || echo "컨테이너 조회 실패"
+        echo ""
+        echo "=== 모든 컨테이너 (정지 포함) ==="
+        docker ps -a || echo "컨테이너 조회 실패"
+        echo ""
+        echo "=== start-all.sh 로그 마지막 20줄 ==="
+        tail -20 {{ remote_docker_container_path }}/scripts/start-all.log 2>/dev/null || echo "로그 파일 없음"
+      become_user: ubuntu
+      register: docker_status
+      retries: 60  # 10분 (60 * 10초)
+      delay: 10
+      until: >
+        docker_status.stdout is search("broker1.*Up") and
+        docker_status.stdout is search("broker2.*Up") and 
+        docker_status.stdout is search("broker3.*Up")
+      failed_when: false
+
+    - name: Docker 상태 상세 정보 출력
+      debug:
+        var: docker_status.stdout_lines
+
+    - name: 컨테이너 시작 완료 확인
+      shell: |
+        running_containers=$(docker ps --filter "status=running" --format "{{.Names}}" | grep -E "(broker|kafka-connect|schema-registry|control-center)" | wc -l)
+        echo "실행 중인 Kafka 관련 컨테이너 수: $running_containers"
+        if [ "$running_containers" -ge 3 ]; then
+          echo "SUCCESS: 주요 컨테이너들이 실행 중입니다"
+          exit 0
+        else
+          echo "WARNING: 일부 컨테이너가 아직 시작되지 않았습니다"
+          exit 1
+        fi
+      become_user: ubuntu
+      register: final_check
+      failed_when: false
+
+    - name: 최종 상태 출력
+      debug:
+        var: final_check.stdout_lines
+
+    - name: Docker 실행 결과 요약
+      debug:
+        msg: |
+          === Docker 컨테이너 시작 완료 ===
+          {% if final_check.rc == 0 %}
+          ✅ 성공적으로 컨테이너들이 시작되었습니다
+          {% else %}
+          ⚠️  일부 컨테이너가 아직 완전히 시작되지 않았을 수 있습니다
+          수동으로 'docker ps'를 확인해보세요
+          {% endif %}
+          
+          상세 로그 확인: {{ remote_docker_container_path }}/scripts/start-all.log
