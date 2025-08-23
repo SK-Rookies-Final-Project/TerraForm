@@ -3,4 +3,6 @@
 sh ip_setup.sh
 
 sh ip_vars_setup.sh
-# ansible-playbook -i inventory.ini setup_connect.yml
+
+# aws 키를 기입해야 함
+ansible-playbook -i inventory.ini setup_connect.yml

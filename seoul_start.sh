@@ -6,4 +6,4 @@ terraform apply -auto-approve -var-file="../common/terraform.tfvars"
 cd ansible
 sh ip_setup.sh
 
-# ansible-playbook -i inventory.ini packages.yml
+sh start_ansible.sh

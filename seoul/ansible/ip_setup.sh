@@ -70,7 +70,7 @@ echo "  Others: ${#others[@]}"
 cat > $INVENTORY_FILE << 'EOL'
 [all:vars]
 ansible_user=ubuntu
-ansible_ssh_private_key_file=test-key.pem
+ansible_ssh_private_key_file==~/Desktop/ct/common/test-key.pem
 ansible_become=yes
 
 EOL

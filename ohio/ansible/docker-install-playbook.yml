@@ -4,6 +4,8 @@
   become: yes
   vars:
     docker_compose_version: "v2.29.7"
+    local_docker_container_path: "../docker-container"  # 로컬 docker-container 디렉토리 경로
+    remote_docker_container_path: "/home/ubuntu"  # 원격 서버 목적지 경로
     
   tasks:
     - name: 시스템 패키지 업데이트
@@ -108,18 +110,73 @@
           newgrp docker
         dest: /tmp/refresh_docker_group.sh
         mode: '0755'
-    
-    - name: 깃허브 클론
-      git:
-        repo: https://github.com/SK-Rookies-Final-Project/Docker-Container.git
-        dest: /home/ubuntu/Docker-Container        
-        clone: yes
-        update: no
+
+    # 로컬 docker-container 디렉토리 복사
+    - name: 로컬 docker-container 디렉토리 존재 확인
+      local_action:
+        module: stat
+        path: "{{ local_docker_container_path }}"
+      register: local_docker_dir
+      run_once: true
+      become: no
+
+    - name: 로컬 docker-container 디렉토리가 없으면 오류 발생
+      fail:
+        msg: "로컬 docker-container 디렉토리를 찾을 수 없습니다: {{ local_docker_container_path }}"
+      when: not local_docker_dir.stat.exists
+      run_once: true
+      become: no
+
+    - name: 원격 서버에 디렉토리 생성
+      file:
+        path: "{{ remote_docker_container_path }}"
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: '0755'
+
+    - name: 로컬 docker-container 디렉토리를 원격 서버로 복사
+      synchronize:
+        src: "{{ local_docker_container_path }}/"
+        dest: "{{ remote_docker_container_path }}"
+        delete: yes
+        recursive: yes
+        perms: yes
+        owner: no
+        group: no
+      become: no
+
+    - name: 복사된 파일들의 소유권 변경
+      file:
+        path: "{{ remote_docker_container_path }}"
+        owner: ubuntu
+        group: ubuntu
+        recurse: yes
+
+    - name: 스크립트 파일들에 실행 권한 부여
+      file:
+        path: "{{ remote_docker_container_path }}/scripts"
+        mode: '0755'
+        recurse: yes
+        state: directory
+      ignore_errors: yes
+
+    - name: start-all.sh 스크립트에 실행 권한 부여
+      file:
+        path: "{{ remote_docker_container_path }}/scripts/start-all.sh"
+        mode: '0755'
+      ignore_errors: yes
 
     - name: Docker 실행
       shell: ./start-all.sh
       args:
-        chdir: /home/ubuntu/Docker-Container/scripts
+        chdir: "{{ remote_docker_container_path }}/scripts"
+      become_user: ubuntu
+      register: docker_start_output
+
+    - name: Docker 시작 로그 출력
+      debug:
+        var: docker_start_output.stdout_lines
 
     - name: Docker 컨테이너가 모두 실행될 때까지 대기
       shell: >
@@ -129,16 +186,4 @@
       retries: 20
       delay: 5
       until: wait_result.rc == 0
-
-
-- name : RDS SETUP
-  hosts: webservers
-  become: true
-  roles:
-    - rds_setup
-
-- name : LINKING SETUP
-  hosts: webservers
-  become: true
-  roles:
-    - linking_setup
+      become_user: ubuntu

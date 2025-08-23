@@ -50,7 +50,7 @@ EOF
         local var_name=$(echo "$name" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]_' | sed 's/^[0-9]/_&/')
         
         # Handle missing IPs
-        [[ "$ip" == "None" ]] && public_ip=""
+        [[ "$ip" == "None" ]] && public_ip=""
         [[ "$private_ip" == "None" ]] && private_ip=""
         
         # Append to file
