@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # AWS EC2 instance IP sync script for Ansible
-# Fetches active instances and creates all.yml with IP variables
+# Fetches active instances and creates ip.yml with IP variables
 # Also updates host_vars/*.yml files with current public_ip values
 
-ALL_YAML="group_vars/all.yml"
+ALL_YAML="group_vars/all/ip.yml"
 HOST_VARS_DIR="host_vars"
 TEMP_FILE=$(mktemp)
 
@@ -29,7 +29,7 @@ fetch_instances() {
         --output text 2>/dev/null
 }
 
-# Generate YAML content for group_vars/all.yml
+# Generate YAML content for group_vars/all/ip.yml
 generate_yaml() {
     local instances_data="$1"
     
@@ -294,7 +294,7 @@ main() {
     done <<< "$instances_data"
     echo ""
     
-    echo "=== Updating group_vars/all.yml ==="
+    echo "=== Updating group_vars/all/ip.yml ==="
     
     # Ensure group_vars directory exists
     if [[ ! -d "group_vars" ]]; then
@@ -327,7 +327,7 @@ main() {
     
     # Show final summary
     echo "Summary:"
-    echo "  - group_vars/all.yml: Updated with $(grep -c "_ip:" "$ALL_YAML" 2>/dev/null || echo "0") variables"
+    echo "  - group_vars/all/ip.yml: Updated with $(grep -c "_ip:" "$ALL_YAML" 2>/dev/null || echo "0") variables"
     echo "  - host_vars/: Processed $instance_count instances"
     echo ""
 }
